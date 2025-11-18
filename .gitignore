@@ -1,5 +1,6 @@
 pyenv/
 slides/
 creds.txt
+certs/
 __pycache__/
 *.pyc

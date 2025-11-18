@@ -43,13 +43,29 @@ cd digital_signage
 # Activate virtual environment
 source pyenv/bin/activate
 
-# Start the development server
+# Start the development server (HTTP)
 python main.py
 ```
 
 The application will be available at `http://localhost:5000`
 
 **Default login credentials:** `admin` / `changeme123` (change these in `creds.txt`!)
+
+### Enable HTTPS (Self-Signed Certificate)
+
+For local testing with HTTPS using a self-signed certificate:
+
+```bash
+# Generate self-signed SSL certificate
+./generate-ssl-cert.sh
+
+# Start server with HTTPS
+python main.py --ssl
+```
+
+The application will be available at `https://localhost:5000`
+
+**Note:** Your browser will show a security warning for self-signed certificates. Click "Advanced" and "Proceed" to continue. This is normal for development.
 
 ---
 
@@ -397,12 +413,13 @@ Navigate to `https://yourdomain.com` and login with your credentials.
 ### Managing TV Content
 
 1. Click on a TV card to access its management page
-2. **Upload PowerPoint**: Drag .pptx file or click to browse (slides extracted automatically)
+2. **Upload PowerPoint**: Drag .pptx file or click to browse (slides extracted automatically using LibreOffice)
 3. **Upload Images**: Drag image files (JPG, PNG, GIF) or click to browse
 4. **Set Duration**: Adjust seconds for each slide (default: 5 seconds)
 5. **Reorder Slides**: Drag slides up/down using the grip icon
-6. **Delete Slides**: Click the trash icon to remove a slide
-7. **Preview**: Click "Preview Display" to see fullscreen view
+6. **Delete Slides**: Click the trash icon to remove individual slides
+7. **Delete All Slides**: Click "Delete All Slides" button to clear all content (requires double confirmation)
+8. **Preview**: Click "Preview Display" to see fullscreen view
 
 ### Display URLs
 
@@ -460,7 +477,8 @@ digital_signage/
 | `/api/upload_image/<tv_id>` | POST | Yes | Upload image |
 | `/api/reorder/<tv_id>` | POST | Yes | Reorder slides |
 | `/api/update_duration/<tv_id>` | POST | Yes | Update slide duration |
-| `/api/delete_slide/<tv_id>` | POST | Yes | Delete slide |
+| `/api/delete_slide/<tv_id>` | POST | Yes | Delete single slide |
+| `/api/delete_all_slides/<tv_id>` | POST | Yes | Delete all slides for TV |
 | `/api/create_tv` | POST | Yes | Create new TV |
 | `/slides/<tv_id>/<filename>` | GET | No | Serve slide image |
 

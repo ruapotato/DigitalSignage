@@ -9,6 +9,8 @@ import json
 import uuid
 import subprocess
 import tempfile
+import sys
+import ssl
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
@@ -434,6 +436,30 @@ def api_delete_slide(tv_id):
     return jsonify({'success': True})
 
 
+@app.route('/api/delete_all_slides/<tv_id>', methods=['POST'])
+@login_required
+def api_delete_all_slides(tv_id):
+    """Delete all slides for a TV"""
+    if not tv_id.startswith('TV_'):
+        return jsonify({'error': 'Invalid TV ID'}), 400
+
+    tv_dir = os.path.join(SLIDES_DIR, tv_id)
+
+    # Get all jpg files
+    jpg_files = [f for f in os.listdir(tv_dir) if f.endswith('.jpg')]
+
+    # Delete all jpg files
+    for filename in jpg_files:
+        filepath = os.path.join(tv_dir, filename)
+        if os.path.exists(filepath):
+            os.remove(filepath)
+
+    # Clear config
+    save_tv_config(tv_id, [])
+
+    return jsonify({'success': True, 'deleted_count': len(jpg_files)})
+
+
 @app.route('/api/create_tv', methods=['POST'])
 @login_required
 def api_create_tv():
@@ -471,6 +497,67 @@ def serve_slide(tv_id, filename):
 
 
 if __name__ == '__main__':
+    # Check for SSL flag
+    use_ssl = '--ssl' in sys.argv or '--https' in sys.argv
+
+    # SSL configuration
+    ssl_context = None
+    if use_ssl:
+        cert_file = 'certs/cert.pem'
+        key_file = 'certs/key.pem'
+
+        if not os.path.exists(cert_file) or not os.path.exists(key_file):
+            print("=" * 60)
+            print("ERROR: SSL certificates not found!")
+            print("=" * 60)
+            print("")
+            print("Please generate SSL certificates first:")
+            print("  ./generate-ssl-cert.sh")
+            print("")
+            print("Or run without SSL:")
+            print("  python main.py")
+            print("")
+            sys.exit(1)
+
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ssl_context.load_cert_chain(cert_file, key_file)
+
+        print("=" * 60)
+        print("Starting Digital Signage Server with HTTPS")
+        print("=" * 60)
+        print(f"Certificate: {cert_file}")
+        print(f"Private Key: {key_file}")
+        print("")
+        print("Access the application at:")
+        print("  https://localhost:5000")
+        print("  https://your-ip-address:5000")
+        print("")
+        print("NOTE: Your browser will show a security warning")
+        print("      for self-signed certificates. This is normal.")
+        print("      Click 'Advanced' and 'Proceed' to continue.")
+        print("=" * 60)
+        print("")
+    else:
+        print("=" * 60)
+        print("Starting Digital Signage Server (HTTP)")
+        print("=" * 60)
+        print("")
+        print("Access the application at:")
+        print("  http://localhost:5000")
+        print("  http://your-ip-address:5000")
+        print("")
+        print("To enable HTTPS with self-signed certificate:")
+        print("  1. Generate certificate: ./generate-ssl-cert.sh")
+        print("  2. Run with SSL: python main.py --ssl")
+        print("=" * 60)
+        print("")
+
     # Run Flask development server
     # For production, use a proper WSGI server
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    port = 5000
+    app.run(
+        host='0.0.0.0',
+        port=port,
+        debug=True,
+        ssl_context=ssl_context
+    )
