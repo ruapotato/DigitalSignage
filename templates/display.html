@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ tv_id }} Display</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+
+        #slideContainer {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+        }
+
+        .slide.active {
+            opacity: 1;
+        }
+
+        .no-slides {
+            color: white;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .no-slides h1 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+
+        .loading {
+            color: white;
+            text-align: center;
+            padding: 40px;
+        }
+
+        /* Hide cursor after inactivity */
+        body.hide-cursor {
+            cursor: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="slideContainer">
+        <div class="loading">
+            <h1>Loading slideshow...</h1>
+        </div>
+    </div>
+
+    <script>
+        const TV_ID = '{{ tv_id }}';
+        let slides = [];
+        let currentIndex = 0;
+        let slideTimeout = null;
+        let checkInterval = null;
+        let lastConfigHash = '';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSlides();
+            startConfigChecker();
+            setupCursorHide();
+        });
+
+        function loadSlides() {
+            fetch(`/api/check/${TV_ID}`)
+                .then(response => response.json())
+                .then(data => {
+                    const newConfigHash = JSON.stringify(data);
+
+                    // Only reload if config changed
+                    if (newConfigHash !== lastConfigHash) {
+                        lastConfigHash = newConfigHash;
+                        slides = data;
+
+                        if (slides.length === 0) {
+                            showNoSlides();
+                        } else {
+                            renderSlides();
+                            startSlideshow();
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading slides:', error);
+                    setTimeout(loadSlides, 5000); // Retry after 5 seconds
+                });
+        }
+
+        function renderSlides() {
+            const container = document.getElementById('slideContainer');
+            container.innerHTML = '';
+
+            slides.forEach((slide, index) => {
+                const img = document.createElement('img');
+                img.src = `/slides/${TV_ID}/${slide.filename}`;
+                img.className = 'slide';
+                img.dataset.index = index;
+                img.dataset.duration = slide.duration_seconds;
+
+                // Preload images
+                img.loading = 'eager';
+
+                container.appendChild(img);
+            });
+        }
+
+        function startSlideshow() {
+            if (slides.length === 0) return;
+
+            // Clear any existing timeout
+            if (slideTimeout) {
+                clearTimeout(slideTimeout);
+            }
+
+            showSlide(currentIndex);
+        }
+
+        function showSlide(index) {
+            const slideElements = document.querySelectorAll('.slide');
+
+            if (slideElements.length === 0) return;
+
+            // Remove active class from all slides
+            slideElements.forEach(slide => slide.classList.remove('active'));
+
+            // Add active class to current slide
+            const currentSlide = slideElements[index];
+            currentSlide.classList.add('active');
+
+            // Get duration from slide data
+            const duration = parseFloat(currentSlide.dataset.duration) * 1000;
+
+            // Schedule next slide
+            slideTimeout = setTimeout(() => {
+                currentIndex = (currentIndex + 1) % slides.length;
+                showSlide(currentIndex);
+            }, duration);
+        }
+
+        function showNoSlides() {
+            const container = document.getElementById('slideContainer');
+            container.innerHTML = `
+                <div class="no-slides">
+                    <h1>{{ tv_id }}</h1>
+                    <p>No slides configured</p>
+                    <p style="margin-top: 20px; font-size: 1.2rem;">
+                        Add slides in the management interface
+                    </p>
+                </div>
+            `;
+        }
+
+        function startConfigChecker() {
+            // Check for config updates every 30 seconds
+            checkInterval = setInterval(() => {
+                fetch(`/api/check/${TV_ID}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const newConfigHash = JSON.stringify(data);
+
+                        if (newConfigHash !== lastConfigHash) {
+                            console.log('Config changed, reloading...');
+                            // Smoothly reload by updating slides
+                            lastConfigHash = newConfigHash;
+                            slides = data;
+                            currentIndex = 0;
+
+                            if (slideTimeout) {
+                                clearTimeout(slideTimeout);
+                            }
+
+                            if (slides.length === 0) {
+                                showNoSlides();
+                            } else {
+                                renderSlides();
+                                startSlideshow();
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error checking config:', error);
+                    });
+            }, 30000); // Check every 30 seconds
+        }
+
+        function setupCursorHide() {
+            let cursorTimeout;
+
+            function hideCursor() {
+                document.body.classList.add('hide-cursor');
+            }
+
+            function showCursor() {
+                document.body.classList.remove('hide-cursor');
+                clearTimeout(cursorTimeout);
+                cursorTimeout = setTimeout(hideCursor, 3000);
+            }
+
+            document.addEventListener('mousemove', showCursor);
+
+            // Initially hide cursor after 3 seconds
+            cursorTimeout = setTimeout(hideCursor, 3000);
+        }
+
+        // Prevent screensaver and sleep
+        let wakeLock = null;
+
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Wake Lock acquired');
+
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Wake Lock released');
+                    });
+                }
+            } catch (err) {
+                console.error('Wake Lock error:', err);
+            }
+        }
+
+        // Request wake lock on page load
+        requestWakeLock();
+
+        // Re-request wake lock on visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                requestWakeLock();
+            }
+        });
+    </script>
+</body>
+</html>

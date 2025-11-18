@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ tv_id }} Management - Digital Signage</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .slide-item {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: white;
+            cursor: move;
+            transition: all 0.2s;
+        }
+        .slide-item:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .slide-item.dragging {
+            opacity: 0.5;
+        }
+        .slide-thumbnail {
+            max-width: 150px;
+            max-height: 85px;
+            object-fit: contain;
+        }
+        .upload-zone {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .upload-zone:hover, .upload-zone.drag-over {
+            border-color: #667eea;
+            background: #f0f0ff;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark">
+        <div class="container-fluid">
+            <a href="{{ url_for('dashboard') }}" class="navbar-brand">
+                <i class="bi bi-arrow-left"></i> Back to Dashboard
+            </a>
+            <span class="navbar-text text-white">
+                Managing: {{ tv_id }}
+            </span>
+            <a href="{{ url_for('display', tv_id=tv_id) }}" class="btn btn-success btn-sm" target="_blank">
+                <i class="bi bi-play-circle"></i> Preview Display
+            </a>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8">
+                <h4>Slides <span class="badge bg-secondary">{{ slides|length }}</span></h4>
+
+                <div id="slidesList" class="mt-3">
+                    {% if slides|length == 0 %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> No slides added yet. Upload a PowerPoint or add images to get started.
+                    </div>
+                    {% else %}
+                    {% for slide in slides %}
+                    <div class="slide-item" draggable="true" data-filename="{{ slide.filename }}">
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <i class="bi bi-grip-vertical text-muted"></i>
+                            </div>
+                            <div class="col-auto">
+                                <img src="{{ url_for('serve_slide', tv_id=tv_id, filename=slide.filename) }}"
+                                     class="slide-thumbnail" alt="Slide">
+                            </div>
+                            <div class="col">
+                                <strong>{{ slide.filename }}</strong>
+                                <div class="input-group input-group-sm mt-2" style="max-width: 200px;">
+                                    <input type="number" class="form-control duration-input"
+                                           value="{{ slide.duration_seconds }}"
+                                           min="1" max="300" step="0.5"
+                                           data-filename="{{ slide.filename }}">
+                                    <span class="input-group-text">seconds</span>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-danger btn-sm" onclick="deleteSlide('{{ slide.filename }}')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <h4>Upload Content</h4>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <i class="bi bi-file-earmark-ppt"></i> PowerPoint Upload
+                    </div>
+                    <div class="card-body">
+                        <div class="upload-zone" id="pptxUploadZone" onclick="document.getElementById('pptxFile').click()">
+                            <i class="bi bi-cloud-upload" style="font-size: 2rem;"></i>
+                            <p class="mb-0 mt-2">Click or drag .pptx file here</p>
+                            <small class="text-muted">Slides will be extracted automatically</small>
+                        </div>
+                        <input type="file" id="pptxFile" accept=".pptx" style="display:none" onchange="uploadPPTX()">
+                        <div id="pptxProgress" class="progress mt-2" style="display:none">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <i class="bi bi-image"></i> Image Upload
+                    </div>
+                    <div class="card-body">
+                        <div class="upload-zone" id="imageUploadZone" onclick="document.getElementById('imageFile').click()">
+                            <i class="bi bi-image" style="font-size: 2rem;"></i>
+                            <p class="mb-0 mt-2">Click or drag image here</p>
+                            <small class="text-muted">JPG, PNG, GIF supported</small>
+                        </div>
+                        <input type="file" id="imageFile" accept="image/*" style="display:none">
+                        <div class="mt-2">
+                            <label class="form-label">Duration (seconds)</label>
+                            <input type="number" id="imageDuration" class="form-control" value="5" min="1" max="300">
+                        </div>
+                        <button class="btn btn-primary btn-sm w-100 mt-2" onclick="uploadImage()">Upload Image</button>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <i class="bi bi-info-circle"></i> Display URL
+                    </div>
+                    <div class="card-body">
+                        <small class="text-muted">Use this URL for TV display:</small>
+                        <div class="input-group input-group-sm mt-2">
+                            <input type="text" class="form-control" id="displayUrl"
+                                   value="{{ request.url_root }}display/{{ tv_id }}" readonly>
+                            <button class="btn btn-outline-secondary" onclick="copyDisplayUrl()">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const TV_ID = '{{ tv_id }}';
+        let draggedElement = null;
+
+        // Drag and drop for reordering
+        document.addEventListener('DOMContentLoaded', function() {
+            setupDragAndDrop();
+            setupFileDropZones();
+            setupDurationInputs();
+        });
+
+        function setupDragAndDrop() {
+            const slidesList = document.getElementById('slidesList');
+
+            slidesList.addEventListener('dragstart', function(e) {
+                if (e.target.classList.contains('slide-item')) {
+                    draggedElement = e.target;
+                    e.target.classList.add('dragging');
+                }
+            });
+
+            slidesList.addEventListener('dragend', function(e) {
+                if (e.target.classList.contains('slide-item')) {
+                    e.target.classList.remove('dragging');
+                }
+            });
+
+            slidesList.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                const afterElement = getDragAfterElement(slidesList, e.clientY);
+                const dragging = document.querySelector('.dragging');
+                if (afterElement == null) {
+                    slidesList.appendChild(dragging);
+                } else {
+                    slidesList.insertBefore(dragging, afterElement);
+                }
+            });
+
+            slidesList.addEventListener('drop', function(e) {
+                e.preventDefault();
+                saveOrder();
+            });
+        }
+
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.slide-item:not(.dragging)')];
+
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        function saveOrder() {
+            const slides = document.querySelectorAll('.slide-item');
+            const order = Array.from(slides).map(slide => slide.dataset.filename);
+
+            fetch(`/api/reorder/${TV_ID}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order: order })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    alert('Error saving order');
+                }
+            });
+        }
+
+        function setupFileDropZones() {
+            // PPTX drop zone
+            const pptxZone = document.getElementById('pptxUploadZone');
+            pptxZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                pptxZone.classList.add('drag-over');
+            });
+            pptxZone.addEventListener('dragleave', () => {
+                pptxZone.classList.remove('drag-over');
+            });
+            pptxZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                pptxZone.classList.remove('drag-over');
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].name.endsWith('.pptx')) {
+                    document.getElementById('pptxFile').files = files;
+                    uploadPPTX();
+                }
+            });
+
+            // Image drop zone
+            const imageZone = document.getElementById('imageUploadZone');
+            imageZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                imageZone.classList.add('drag-over');
+            });
+            imageZone.addEventListener('dragleave', () => {
+                imageZone.classList.remove('drag-over');
+            });
+            imageZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                imageZone.classList.remove('drag-over');
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].type.startsWith('image/')) {
+                    document.getElementById('imageFile').files = files;
+                }
+            });
+        }
+
+        function setupDurationInputs() {
+            document.querySelectorAll('.duration-input').forEach(input => {
+                input.addEventListener('change', function() {
+                    const filename = this.dataset.filename;
+                    const duration = parseFloat(this.value);
+
+                    fetch(`/api/update_duration/${TV_ID}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ filename: filename, duration: duration })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data.success) {
+                            alert('Error updating duration');
+                        }
+                    });
+                });
+            });
+        }
+
+        function uploadPPTX() {
+            const fileInput = document.getElementById('pptxFile');
+            const file = fileInput.files[0];
+
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            document.getElementById('pptxProgress').style.display = 'block';
+
+            fetch(`/api/upload_pptx/${TV_ID}`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('pptxProgress').style.display = 'none';
+                if (data.success) {
+                    alert(`Successfully added ${data.slides_added} slides!`);
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Upload failed'));
+                }
+            })
+            .catch(error => {
+                document.getElementById('pptxProgress').style.display = 'none';
+                alert('Error uploading file: ' + error);
+            });
+        }
+
+        function uploadImage() {
+            const fileInput = document.getElementById('imageFile');
+            const file = fileInput.files[0];
+            const duration = document.getElementById('imageDuration').value;
+
+            if (!file) {
+                alert('Please select an image file');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('duration', duration);
+
+            fetch(`/api/upload_image/${TV_ID}`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Upload failed'));
+                }
+            })
+            .catch(error => {
+                alert('Error uploading image: ' + error);
+            });
+        }
+
+        function deleteSlide(filename) {
+            if (!confirm('Delete this slide?')) return;
+
+            fetch(`/api/delete_slide/${TV_ID}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: filename })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert('Error deleting slide');
+                }
+            });
+        }
+
+        function copyDisplayUrl() {
+            const input = document.getElementById('displayUrl');
+            input.select();
+            document.execCommand('copy');
+            alert('URL copied to clipboard!');
+        }
+    </script>
+</body>
+</html>

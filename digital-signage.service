@@ -1,0 +1,15 @@
+[Unit]
+Description=Digital Signage Management System
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/digital_signage
+Environment="PATH=/opt/digital_signage/pyenv/bin"
+ExecStart=/opt/digital_signage/pyenv/bin/python /opt/digital_signage/main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
