@@ -43,29 +43,28 @@ cd digital_signage
 # Activate virtual environment
 source pyenv/bin/activate
 
-# Start the development server (HTTP)
-python main.py
-```
-
-The application will be available at `http://localhost:5000`
-
-**Default login credentials:** `admin` / `changeme123` (change these in `creds.txt`!)
-
-### Enable HTTPS (Self-Signed Certificate)
-
-For local testing with HTTPS using a self-signed certificate:
-
-```bash
-# Generate self-signed SSL certificate
+# Generate self-signed SSL certificate (required for HTTPS - default mode)
 ./generate-ssl-cert.sh
 
-# Start server with HTTPS
-python main.py --ssl
+# Start the development server (HTTPS enabled by default)
+python main.py
 ```
 
 The application will be available at `https://localhost:5000`
 
+**Default login credentials:** `admin` / `changeme123` (change these in `creds.txt`!)
+
 **Note:** Your browser will show a security warning for self-signed certificates. Click "Advanced" and "Proceed" to continue. This is normal for development.
+
+### Optional: Run Without HTTPS
+
+To disable HTTPS and run in HTTP mode:
+
+```bash
+python main.py --no-ssl
+```
+
+The application will be available at `http://localhost:5000`
 
 ---
 

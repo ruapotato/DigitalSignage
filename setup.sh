@@ -48,6 +48,43 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Generate SSL certificate if it doesn't exist
+echo ""
+if [ ! -f "certs/cert.pem" ] || [ ! -f "certs/key.pem" ]; then
+    echo "Generating SSL certificate..."
+    echo ""
+    echo "HTTPS is enabled by default. Generating self-signed certificate..."
+
+    # Check if openssl is available
+    if ! command -v openssl &> /dev/null; then
+        echo "Warning: openssl not found. Skipping SSL certificate generation."
+        echo "You can generate it later by running: ./generate-ssl-cert.sh"
+    else
+        # Create certs directory
+        mkdir -p certs
+
+        # Generate certificate non-interactively with localhost as default
+        openssl req -x509 -newkey rsa:4096 -nodes \
+            -keyout certs/key.pem \
+            -out certs/cert.pem \
+            -days 365 \
+            -subj "/C=US/ST=State/L=City/O=DigitalSignage/CN=localhost" \
+            2>/dev/null
+
+        if [ $? -eq 0 ]; then
+            echo "SSL certificate generated successfully!"
+            echo "  Certificate: certs/cert.pem"
+            echo "  Private Key: certs/key.pem"
+            echo "  Valid for: 365 days"
+        else
+            echo "Warning: Failed to generate SSL certificate"
+            echo "You can generate it later by running: ./generate-ssl-cert.sh"
+        fi
+    fi
+else
+    echo "SSL certificate already exists"
+fi
+
 echo ""
 echo "=========================================="
 echo "Setup completed successfully!"
@@ -56,11 +93,16 @@ echo ""
 echo "To start the application:"
 echo "  1. Activate virtual environment: source pyenv/bin/activate"
 echo "  2. Run the server: python main.py"
-echo "  3. Open browser: http://localhost:5000"
+echo "  3. Open browser: https://localhost:5000"
 echo ""
 echo "Default credentials:"
 echo "  Username: admin"
 echo "  Password: changeme123"
 echo ""
 echo "IMPORTANT: Change the password in creds.txt before production use!"
+echo ""
+echo "NOTE: Your browser will show a security warning for the self-signed"
+echo "      certificate. Click 'Advanced' and 'Proceed' to continue."
+echo ""
+echo "To run without HTTPS: python main.py --no-ssl"
 echo ""

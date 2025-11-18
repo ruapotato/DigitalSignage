@@ -497,8 +497,8 @@ def serve_slide(tv_id, filename):
 
 
 if __name__ == '__main__':
-    # Check for SSL flag
-    use_ssl = '--ssl' in sys.argv or '--https' in sys.argv
+    # HTTPS is enabled by default, use --no-ssl or --http to disable
+    use_ssl = not ('--no-ssl' in sys.argv or '--http' in sys.argv)
 
     # SSL configuration
     ssl_context = None
@@ -515,7 +515,7 @@ if __name__ == '__main__':
             print("  ./generate-ssl-cert.sh")
             print("")
             print("Or run without SSL:")
-            print("  python main.py")
+            print("  python main.py --no-ssl")
             print("")
             sys.exit(1)
 
@@ -523,7 +523,7 @@ if __name__ == '__main__':
         ssl_context.load_cert_chain(cert_file, key_file)
 
         print("=" * 60)
-        print("Starting Digital Signage Server with HTTPS")
+        print("Starting Digital Signage Server with HTTPS (default)")
         print("=" * 60)
         print(f"Certificate: {cert_file}")
         print(f"Private Key: {key_file}")
@@ -535,20 +535,22 @@ if __name__ == '__main__':
         print("NOTE: Your browser will show a security warning")
         print("      for self-signed certificates. This is normal.")
         print("      Click 'Advanced' and 'Proceed' to continue.")
+        print("")
+        print("To disable HTTPS: python main.py --no-ssl")
         print("=" * 60)
         print("")
     else:
         print("=" * 60)
-        print("Starting Digital Signage Server (HTTP)")
+        print("Starting Digital Signage Server (HTTP - SSL disabled)")
         print("=" * 60)
         print("")
         print("Access the application at:")
         print("  http://localhost:5000")
         print("  http://your-ip-address:5000")
         print("")
-        print("To enable HTTPS with self-signed certificate:")
+        print("To enable HTTPS (default):")
         print("  1. Generate certificate: ./generate-ssl-cert.sh")
-        print("  2. Run with SSL: python main.py --ssl")
+        print("  2. Run: python main.py")
         print("=" * 60)
         print("")
 
