@@ -13,13 +13,11 @@ A lightweight, file-based digital signage system built with Flask for managing c
 - Fullscreen slideshow display with auto-refresh
 - Simple session-based authentication
 - No database required - filesystem only
-- HTTPS ready with Let's Encrypt support
 
 ## System Requirements
 
 - Debian 11+ or Ubuntu 20.04+ (or similar Linux distribution)
 - Python 3.8+
-- Nginx (for production deployment)
 - Chromium browser (for display clients)
 
 ---
@@ -202,24 +200,6 @@ sudo certbot --nginx -d youractual.domain.com
 sudo certbot renew --dry-run
 ```
 
-### Step 8: Restore Full Nginx Configuration
-
-After certbot succeeds:
-
-```bash
-# Use the original configuration with SSL paths
-sudo cp nginx-site.conf /tmp/nginx-final.conf
-
-# Update domain
-sudo sed -i 's/your-domain.com/youractual.domain.com/g' /tmp/nginx-final.conf
-
-# Install final configuration
-sudo cp /tmp/nginx-final.conf /etc/nginx/sites-available/digital-signage
-
-# Test and reload
-sudo nginx -t
-sudo systemctl reload nginx
-```
 
 ### Step 9: Configure Firewall
 
@@ -238,15 +218,6 @@ sudo ufw allow 443/tcp
 sudo ufw status
 ```
 
-### Step 10: Create Slides Directories
-
-```bash
-# Create initial TV directories
-sudo -u www-data mkdir -p /opt/digital_signage/slides/TV_001
-sudo -u www-data mkdir -p /opt/digital_signage/slides/TV_002
-echo "[]" | sudo -u www-data tee /opt/digital_signage/slides/TV_001/config.json
-echo "[]" | sudo -u www-data tee /opt/digital_signage/slides/TV_002/config.json
-```
 
 ### Verify Deployment
 
@@ -661,47 +632,6 @@ subprocess.run(['libreoffice', '--headless', '--convert-to', 'pdf', pptx_file])
 5. **Regular updates**: Keep system and packages updated
 6. **Limit access**: Consider restricting admin interface to internal network only (nginx allow/deny rules)
 
-### Optional: Restrict Admin Access to Internal Network
-
-Edit `/etc/nginx/sites-available/digital-signage`:
-
-```nginx
-location / {
-    allow 192.168.1.0/24;  # Your internal network
-    deny all;
-    proxy_pass http://127.0.0.1:5000;
-}
-
-location /display/ {
-    # Keep display URLs public
-    proxy_pass http://127.0.0.1:5000;
-}
-```
-
----
-
-## Performance Tips
-
-### Nginx Caching
-
-Add to nginx server block:
-
-```nginx
-location ~* \.(jpg|jpeg|png|gif)$ {
-    expires 1h;
-    add_header Cache-Control "public, immutable";
-}
-```
-
-### Reduce Chromium Memory Usage
-
-In `kiosk-startup.sh`, add these flags to chromium command:
-```bash
---disk-cache-size=52428800 \
---media-cache-size=52428800
-```
-
----
 
 ## Technical Details
 
@@ -718,7 +648,7 @@ In `kiosk-startup.sh`, add these flags to chromium command:
 
 ## License
 
-This is a custom implementation for small-scale digital signage deployment.
+AGPL
 
 ## Support
 
@@ -738,12 +668,6 @@ For issues or questions:
 sudo systemctl status digital-signage    # Check service status
 sudo systemctl restart digital-signage   # Restart service
 sudo journalctl -u digital-signage -f    # View logs
-sudo nginx -t                            # Test nginx config
-sudo certbot renew                       # Renew SSL certificate
-
-# Display Client
-./kiosk-startup.sh TV_001               # Start kiosk mode
-pkill chromium                          # Stop kiosk mode
 ```
 
 ### Important URLs
