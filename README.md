@@ -32,27 +32,44 @@ sudo git clone https://github.com/ruapotato/DigitalSignage.git digital_signage
 cd digital_signage
 ```
 
-### Quick Setup (Development/Testing)
+### Quick Setup (Automated)
+
+The setup script will automatically:
+- Detect your OS and install all required system packages (Python, pip, OpenSSL, LibreOffice, poppler-utils)
+- Create a Python virtual environment
+- Install Python dependencies
+- Generate SSL certificates
+- Optionally setup systemd service for auto-start on boot
 
 ```bash
 # Run the automated setup script
 ./setup.sh
+```
 
-# Activate virtual environment
+Follow the prompts to:
+1. Install system dependencies (requires sudo)
+2. Choose whether to setup systemd service for auto-start
+3. Optionally start the service immediately
+
+**If you chose NOT to setup systemd service**, start manually:
+```bash
 source pyenv/bin/activate
-
-# Generate self-signed SSL certificate (required for HTTPS - default mode)
-./generate-ssl-cert.sh
-
-# Start the development server (HTTPS enabled by default)
 python main.py
+```
+
+**If you setup the systemd service**, manage it with:
+```bash
+sudo systemctl start digital-signage    # Start the service
+sudo systemctl stop digital-signage     # Stop the service
+sudo systemctl status digital-signage   # Check status
+sudo journalctl -u digital-signage -f   # View logs
 ```
 
 The application will be available at `https://localhost:5000`
 
 **Default login credentials:** `admin` / `changeme123` (change these in `creds.txt`!)
 
-**Note:** Your browser will show a security warning for self-signed certificates. Click "Advanced" and "Proceed" to continue. This is normal for development.
+**Note:** Your browser will show a security warning for self-signed certificates. Click "Advanced" and "Proceed" to continue. This is normal for self-signed certificates.
 
 ### Optional: Run Without HTTPS
 
@@ -76,24 +93,7 @@ The application will be available at `http://localhost:5000`
 - [ ] At least 10GB free disk space
 - [ ] Updated system packages
 
-### Step 1: Update System and Install Dependencies
-
-```bash
-sudo apt update
-sudo apt upgrade -y
-
-sudo apt install -y \
-    python3 \
-    python3-pip \
-    python3-venv \
-    nginx \
-    certbot \
-    python3-certbot-nginx \
-    git \
-    ufw
-```
-
-### Step 2: Clone and Deploy Application
+### Step 1: Clone Repository
 
 ```bash
 # Clone repository
@@ -101,12 +101,18 @@ cd /opt
 sudo git clone https://github.com/ruapotato/DigitalSignage.git digital_signage
 cd digital_signage
 
-# Set ownership
-sudo chown -R www-data:www-data /opt/digital_signage
+# Install additional production packages
+sudo apt update
+sudo apt install -y nginx certbot python3-certbot-nginx git ufw
+```
 
-# Set permissions
-sudo chmod 755 /opt/digital_signage
-sudo chmod +x /opt/digital_signage/kiosk-startup.sh
+### Step 2: Run Automated Setup
+
+```bash
+# Run setup script (installs dependencies, creates venv, generates SSL cert)
+./setup.sh
+
+# When prompted, choose 'y' to setup systemd service for auto-start
 ```
 
 ### Step 3: Configure Credentials
@@ -127,40 +133,17 @@ sudo chmod 600 /root/digital-signage-password.txt
 echo "Password saved to /root/digital-signage-password.txt"
 ```
 
-### Step 4: Set Up Python Environment
+### Step 4: Verify Service is Running
 
 ```bash
-cd /opt/digital_signage
-
-# Create virtual environment as www-data
-sudo -u www-data python3 -m venv pyenv
-
-# Install dependencies
-sudo -u www-data pyenv/bin/pip install --upgrade pip
-sudo -u www-data pyenv/bin/pip install -r requirements.txt
-```
-
-### Step 5: Configure Systemd Service
-
-```bash
-# Copy service file
-sudo cp digital-signage.service /etc/systemd/system/
-
-# Reload systemd
-sudo systemctl daemon-reload
-
-# Enable and start service
-sudo systemctl enable digital-signage
-sudo systemctl start digital-signage
-
-# Check status
+# Check service status
 sudo systemctl status digital-signage
 
-# Verify service is running
+# Verify service is accessible locally
 curl http://localhost:5000
 ```
 
-### Step 6: Configure Nginx (Before SSL)
+### Step 5: Configure Nginx (Before SSL)
 
 ```bash
 # Copy and edit nginx configuration
@@ -187,7 +170,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### Step 7: Obtain SSL Certificate with Let's Encrypt
+### Step 6: Obtain SSL Certificate with Let's Encrypt
 
 ```bash
 # Run certbot - it will automatically configure nginx
@@ -201,7 +184,7 @@ sudo certbot renew --dry-run
 ```
 
 
-### Step 9: Configure Firewall
+### Step 7: Configure Firewall
 
 ```bash
 # Enable UFW
@@ -604,22 +587,24 @@ curl http://localhost:5000
 
 ## PowerPoint Conversion Notes
 
-The current implementation extracts embedded images from PowerPoint slides. For best results:
+The system now automatically installs LibreOffice during setup and uses it to convert PowerPoint presentations to images. This provides high-quality rendering of all slide content including:
 
-1. **Use PowerPoint with image backgrounds** - Slides with images work best
-2. **Export slides as images first** - Alternative approach for complex slides
-3. **Install LibreOffice for advanced conversion**:
+- Text and formatting
+- Images and graphics
+- Charts and diagrams
+- Shapes and effects
 
-```bash
-sudo apt install -y libreoffice python3-uno
-```
+The conversion process:
+1. PowerPoint file is uploaded via the web interface
+2. LibreOffice converts the .pptx to PDF format
+3. Each PDF page is converted to a JPG image at 1920x1080 resolution
+4. Images are saved and added to the TV's slideshow
 
-Then modify `main.py` at line 100 to use LibreOffice conversion:
-```python
-import subprocess
-subprocess.run(['libreoffice', '--headless', '--convert-to', 'pdf', pptx_file])
-# Then use pdf2image to convert PDF pages to JPG
-```
+**For best results:**
+- Use standard 16:9 aspect ratio slides (1920x1080)
+- Keep text large and readable
+- Use high-contrast colors
+- Test with the preview function before deploying to displays
 
 ---
 
